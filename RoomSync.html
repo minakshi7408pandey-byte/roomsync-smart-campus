@@ -1,0 +1,774 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>RoomSync</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: sticky top bar, tab row, then a two-column work area (search + results | live floor maps). Maps are the hero. */
+:root{
+  --bg:#eef1f3; --surface:#ffffff; --fg:#16202a; --muted:#566471; --line:#d3dbe1; --accent:#1d4fd7; --accent-fg:#ffffff;
+  --free:#16794a; --free-bg:#e2f4ea; --busy:#b3261e; --busy-bg:#fbe6e3; --warn:#9a6700; --warn-bg:#fdf0d2; --off-bg:#e6eaed; --soft:#e4eaf6;
+  --sans:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif; --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f161c; --surface:#18222b; --fg:#e6ecf1; --muted:#97a6b3; --line:#2b3947; --accent:#7ca2ff; --accent-fg:#0b1220;
+  --free:#59d18d; --free-bg:#12301f; --busy:#ff8b80; --busy-bg:#3a1916; --warn:#f0c060; --warn-bg:#352a0e; --off-bg:#1f2a34; --soft:#1b2a4a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f161c; --surface:#18222b; --fg:#e6ecf1; --muted:#97a6b3; --line:#2b3947; --accent:#7ca2ff; --accent-fg:#0b1220;
+  --free:#59d18d; --free-bg:#12301f; --busy:#ff8b80; --busy-bg:#3a1916; --warn:#f0c060; --warn-bg:#352a0e; --off-bg:#1f2a34; --soft:#1b2a4a; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:14px/1.45 var(--sans);padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px));padding-block:0 40px}
+h1,h2,h3{margin:0;font-weight:600;text-wrap:balance}
+button,select,input,textarea{font:inherit;color:inherit}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.app{max-width:1280px;margin:0 auto}
+.top{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;justify-content:space-between;padding:14px 0 10px}
+.brand{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.brand h1{font-size:20px;letter-spacing:-.01em}
+.brand span{color:var(--muted);font-size:13px}
+.who{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:500;border:1px solid var(--line);background:var(--surface);color:var(--muted);white-space:nowrap}
+.chip.test{background:var(--warn-bg);border-color:var(--warn);color:var(--warn);font-family:var(--mono);letter-spacing:.04em;font-size:11px}
+.chip.ok{background:var(--free-bg);border-color:var(--free);color:var(--free)}
+.chip.bad{background:var(--busy-bg);border-color:var(--busy);color:var(--busy)}
+.chip.warn{background:var(--warn-bg);border-color:var(--warn);color:var(--warn)}
+.chip.info{background:var(--soft);border-color:var(--accent);color:var(--accent)}
+nav{display:flex;gap:2px;border-bottom:1px solid var(--line);overflow-x:auto;margin-bottom:16px}
+nav a{padding:9px 14px;text-decoration:none;color:var(--muted);font-weight:500;border-bottom:2px solid transparent;white-space:nowrap}
+nav a[aria-current="page"]{color:var(--fg);border-color:var(--accent)}
+nav a:hover{color:var(--fg)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.cols{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:20px;align-items:start}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px;min-width:0}
+.panel+.panel{margin-top:14px}
+.panel h2{font-size:15px;margin-bottom:10px}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:3px;font-weight:500}
+select,input[type=text],input[type=date],textarea,input[type=number]{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:4px;background:var(--surface);min-height:34px}
+textarea{resize:vertical;min-height:70px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.stack{display:grid;gap:10px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:4px;padding:6px 12px;cursor:pointer;font-weight:500;min-height:32px}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.btn.danger{color:var(--busy);border-color:var(--busy)}
+.btn.sm{padding:3px 9px;min-height:26px;font-size:13px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.nl{display:flex;gap:6px}
+.nl input{flex:1;min-width:0}
+.small{font-size:12px}
+.res{display:grid;gap:8px;margin-top:6px}
+.item{border:1px solid var(--line);border-radius:5px;padding:9px 10px;display:grid;gap:4px;background:var(--surface)}
+.item.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.item .hd{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+.item b{font-weight:600}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:8px}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:2px;border:1.5px solid;vertical-align:-2px;margin-right:5px}
+.fl{margin-bottom:14px}
+.fl h3{font-size:13px;margin-bottom:4px;color:var(--muted);font-weight:500}
+.fl h3 b{color:var(--fg);font-weight:600}
+svg.map{width:100%;height:auto;display:block}
+.room{cursor:pointer}
+.room rect{stroke-width:1.5}
+.room.free rect{fill:var(--free-bg);stroke:var(--free)}
+.room.busy rect{fill:var(--busy-bg);stroke:var(--busy)}
+.room.small rect{fill:var(--warn-bg);stroke:var(--warn)}
+.room.off rect,.room.na rect,.room.out rect{fill:var(--off-bg);stroke:var(--line);stroke-dasharray:4 3}
+.room.out rect{stroke:var(--busy)}
+.room.selected rect{stroke:var(--accent);stroke-width:3}
+.room text{fill:var(--fg);font-family:var(--sans);pointer-events:none}
+.room .rn{font-size:12px;font-weight:600}
+.room .rs{font-size:10.5px;fill:var(--muted);font-family:var(--mono)}
+.room:focus-visible rect{stroke:var(--accent);stroke-width:3}
+.stair rect{fill:none;stroke:var(--line);stroke-width:1}
+.stair line{stroke:var(--line)}
+.tl{position:relative;height:34px;background:var(--off-bg);border-radius:4px;margin:8px 0 2px}
+.tl .blk{position:absolute;top:3px;bottom:3px;background:var(--busy-bg);border:1px solid var(--busy);border-radius:3px;overflow:hidden;font-size:11px;padding:2px 4px;white-space:nowrap;text-overflow:ellipsis}
+.tl .win{position:absolute;top:0;bottom:0;border:2px dashed var(--accent);border-radius:3px;background:var(--soft);opacity:.7}
+.ticks{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);font-family:var(--mono)}
+.day{margin-bottom:18px}
+.day h3{font-size:13px;color:var(--muted);font-weight:600;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em}
+.card{border:1px solid var(--line);border-radius:5px;background:var(--surface);padding:10px 12px;display:grid;gap:6px;margin-bottom:8px}
+.card.cancelled{opacity:.75}
+.card.cancelled .t{text-decoration:line-through}
+.card .hd{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.card .t{font-weight:600}
+.card .tm{font-family:var(--mono);font-size:13px}
+.card .meta{display:flex;gap:6px 12px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.card .act{display:flex;gap:6px;flex-wrap:wrap}
+details summary{cursor:pointer;color:var(--accent);font-size:12.5px}
+details ul{margin:6px 0 0;padding-left:18px;font-size:12.5px;color:var(--muted)}
+.notice.sup{opacity:.6}
+.notice p{margin:2px 0 6px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:500;font-size:12px}
+.tw{overflow-x:auto}
+.scrim{position:fixed;inset:0;background:rgba(10,16,22,.55);display:flex;align-items:flex-start;justify-content:center;padding:max(16px,env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px));overflow-y:auto;z-index:20}
+.modal{background:var(--surface);border:1px solid var(--line);border-radius:8px;width:100%;max-width:560px;padding:16px;margin-top:4vh}
+.modal h2{font-size:17px;margin-bottom:12px}
+.msg{border-radius:5px;padding:9px 11px;border:1px solid;font-size:13px}
+.msg.bad{background:var(--busy-bg);border-color:var(--busy)}
+.msg.good{background:var(--free-bg);border-color:var(--free)}
+.msg.warn{background:var(--warn-bg);border-color:var(--warn)}
+.msg ul{margin:4px 0 0;padding-left:18px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:max(16px,env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:9px 16px;border-radius:6px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:30;max-width:90vw}
+.toast.on{opacity:1}
+.hint{font-size:12px;color:var(--muted)}
+@media (max-width:860px){.cols{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:480px){.grid3{grid-template-columns:1fr 1fr}}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+<div class="app">
+  <header class="top">
+    <div class="brand"><h1>RoomSync</h1><span>IET and Deeksha Bhawan, DDUGU</span><span class="chip test">TEST DATA</span></div>
+    <div class="who" id="who"></div>
+  </header>
+  <nav id="nav" aria-label="Sections"></nav>
+  <main id="view"></main>
+</div>
+<div id="modal"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+'use strict';
+// ===== LOGIC (no DOM) =====
+const NOW = '2026-11-05';
+const OPEN = 540, CLOSE = 1020, BUFFER = 10;
+const DAYN = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const pad = n => String(n).padStart(2, '0');
+const toMin = s => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
+const fmt = m => pad(Math.floor(m / 60)) + ':' + pad(m % 60);
+const addDays = (iso, n) => { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const dow = iso => new Date(iso + 'T00:00:00Z').getUTCDay();
+const dlabel = iso => { const d = new Date(iso + 'T00:00:00Z'); return DAYN[d.getUTCDay()] + ' ' + d.getUTCDate() + ' ' + MON[d.getUTCMonth()]; };
+const weekStart = iso => { const w = dow(iso); return addDays(iso, w === 0 ? -6 : 1 - w); };
+const ov = (s1, e1, s2, e2) => s1 < e2 && e1 > s2;
+
+const BUILD = { IET: 'IET', DB: 'Deeksha Bhawan' };
+const TYPENAME = { class: 'classroom', lab: 'laboratory', hall: 'seminar hall', library: 'library', office: 'office' };
+const TL = { timetable: 'Regular class', extra: 'Extra class', exam: 'Minor exam', practical: 'Practical', event: 'Event' };
+const USE = { extra: ['class', 'hall'], exam: ['class', 'hall', 'library'], practical: ['lab'], event: ['class', 'hall', 'library'], timetable: ['class', 'hall', 'lab'] };
+
+// ---- Rooms (from the blueprints and the problem text) ----
+const R = [];
+function room(id, b, floor, name, type, cap, o) { R.push(Object.assign({ id, b, floor, name, type, cap, bookable: true, tbc: false, out: false, outReason: '' }, o || {})); }
+room('IET-LIB', 'IET', 0, 'Library', 'library', 180, { note: 'Approx. 150-180 seats; used for exams' });
+room('IET-TO', 'IET', 0, "Teachers' office", 'office', 0, { bookable: false });
+room('IET-PC', 'IET', 0, 'Placement Cell', 'office', 0, { bookable: false });
+room('IET-DIR', 'IET', 0, "Director's office", 'office', 0, { bookable: false });
+['IET22', 'IET16', 'IET14', 'IET15'].forEach(id => room(id, 'IET', 1, id, 'lab', 40, { tbc: true, note: 'Lab (department and capacity to be confirmed)' }));
+['IET20', 'IET19', 'IET18', 'IET17'].forEach(id => room(id, 'IET', 1, id, 'class', 75));
+room('IET32', 'IET', 2, 'IET32 Seminar Hall', 'hall', 200);
+['IET24', 'IET25', 'IET30', 'IET29', 'IET28'].forEach(id => room(id, 'IET', 2, id, 'class', 75));
+room('IET23', 'IET', 2, 'IET23', 'class', 75, { tbc: true, note: 'On the blueprint, not in the text' });
+for (let i = 1; i <= 14; i++) {
+  const id = 'LH' + pad(i);
+  room(id, 'DB', i <= 7 ? 0 : 1, id, 'class', [1, 2, 8, 9].includes(i) ? 90 : 60, { tbc: true, note: i > 12 ? 'On the blueprint only (text lists LH01-LH12)' : 'Capacity to be confirmed' });
+}
+const roomById = id => R.find(r => r.id === id);
+const roomLabel = r => (r.floor === 0 ? 'Ground' : r.floor === 1 ? 'First' : 'Second') + ' floor';
+
+// ---- Students / branches ----
+const BRANCHES = [
+  { k: 'CSE', n: 'CSE', secs: ['A', 'B'] }, { k: 'AIML', n: 'AI ML', secs: ['A', 'B'] },
+  { k: 'AIDS', n: 'AI DS', secs: ['All'] }, { k: 'ECE', n: 'ECE', secs: ['All'] },
+  { k: 'ME', n: 'ME', secs: ['All'] }, { k: 'IT', n: 'IT', secs: ['All'] }
+];
+const bname = k => (BRANCHES.find(b => b.k === k) || { n: 'All branches' }).n;
+const GROUPS = [];
+BRANCHES.forEach(b => [1, 2, 3, 4].forEach(y => b.secs.forEach(s => GROUPS.push({ branch: b.k, year: y, section: s, size: 75, key: b.k + '-' + y + '-' + s }))));
+const groupLabel = g => bname(g.branch) + ' Year ' + g.year + (g.section !== 'All' ? ' Sec ' + g.section : '');
+const audLabel = a => a.branch === 'ALL' ? 'All students' : bname(a.branch) + (a.year ? ' Year ' + a.year : ' all years') + (a.section && a.section !== 'All' ? ' Sec ' + a.section : '');
+const secOk = (a, b) => a === 'All' || b === 'All' || a === b || !a || !b;
+const matchAud = (a, g) => (a.branch === 'ALL' || a.branch === g.branch) && (!a.year || a.year === g.year) && secOk(a.section, g.section);
+const audOverlap = (a, b) => !!a && !!b && (a.branch === 'ALL' || b.branch === 'ALL' || a.branch === b.branch) && (!a.year || !b.year || a.year === b.year) && secOk(a.section, b.section);
+const audSize = a => GROUPS.filter(g => matchAud(a, g)).reduce((s, g) => s + g.size, 0);
+
+const FAC = [
+  { id: 'F1', name: 'Dr. R. Verma' }, { id: 'F2', name: 'Prof. S. Mishra' }, { id: 'F3', name: 'Dr. A. Singh' },
+  { id: 'F4', name: 'Prof. N. Gupta' }, { id: 'F5', name: 'Dr. P. Tiwari' }, { id: 'F6', name: 'Prof. K. Yadav' },
+  { id: 'F7', name: 'Dr. M. Pandey' }, { id: 'F8', name: 'Prof. D. Shukla' }, { id: 'ADMIN', name: 'Exam Cell' }
+];
+const facName = id => (FAC.find(f => f.id === id) || { name: '-' }).name;
+
+// ---- Store ----
+const S = { bookings: [], notices: [], audit: [], seq: 1000, nseq: 0 };
+const stamp = () => new Date().toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
+function fnv(s) { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16).padStart(8, '0'); }
+function audit(actor, action, text, bid) {
+  const prev = S.audit.length ? S.audit[S.audit.length - 1].hash : '00000000';
+  const ts = stamp();
+  S.audit.push({ n: S.audit.length + 1, ts, actor, action, text, bid: bid || '', hash: fnv(prev + '|' + ts + '|' + actor + '|' + action + '|' + text) });
+}
+function verifyChain() {
+  let prev = '00000000';
+  for (const e of S.audit) { if (fnv(prev + '|' + e.ts + '|' + e.actor + '|' + e.action + '|' + e.text) !== e.hash) return { ok: false, at: e.n }; prev = e.hash; }
+  return { ok: true, n: S.audit.length };
+}
+
+// ---- Conflict engine ----
+const needsApproval = (b, who) => who.role !== 'admin' && (roomById(b.roomId).type === 'library' || (b.type === 'event' && roomById(b.roomId).type === 'hall'));
+const can = (who, act, b) => who.role === 'admin' ? true : who.role === 'faculty' ? (act === 'create' || (!!b && b.facId === who.id && b.type !== 'timetable')) : (who.role === 'student' && act === 'report');
+const live = (date, ignore) => S.bookings.filter(x => x.id !== ignore && x.status !== 'cancelled' && x.date === date);
+
+function check(b, ignore) {
+  const res = { errors: [], warns: [], clash: { room: [], aud: [], fac: [] } };
+  const rm = roomById(b.roomId);
+  if (!rm) { res.errors.push('Pick a room.'); return res; }
+  if (!rm.bookable) res.errors.push(rm.name + ' is not a bookable space.');
+  if (rm.out) res.errors.push(rm.name + ' is marked unavailable' + (rm.outReason ? ' (' + rm.outReason + ')' : '') + '.');
+  if (b.end <= b.start) res.errors.push('End time must be after start time.');
+  if (b.start < OPEN || b.end > CLOSE) res.errors.push('Bookings run from 09:00 to 17:00.');
+  if (rm.bookable && !USE[b.type].includes(rm.type)) res.errors.push(TL[b.type] + ' cannot be held in a ' + TYPENAME[rm.type] + ' (allowed: ' + USE[b.type].map(t => TYPENAME[t]).join(', ') + ').');
+  if (rm.bookable && b.need > rm.cap) res.errors.push('Needs ' + b.need + ' seats but ' + rm.name + ' has ' + rm.cap + '.');
+  else if (rm.bookable && b.need / rm.cap > 0.95) res.warns.push({ kind: 'full', text: 'Room will be completely full (' + b.need + ' of ' + rm.cap + ').' });
+  for (const x of live(b.date, ignore)) {
+    const xr = roomById(x.roomId), o = ov(b.start, b.end, x.start, x.end);
+    const when = fmt(x.start) + '-' + fmt(x.end);
+    if (o && x.roomId === b.roomId) { res.clash.room.push(x); res.errors.push('Room already booked: "' + x.title + '" (' + when + ').'); }
+    if (o && audOverlap(x.aud, b.aud)) { res.clash.aud.push(x); res.errors.push(audLabel(b.aud) + ' already has "' + x.title + '" at ' + when + ' in ' + xr.name + '.'); }
+    if (o && b.facId && x.facId === b.facId && b.facId !== 'ADMIN') { res.clash.fac.push(x); res.errors.push(facName(b.facId) + ' is already teaching "' + x.title + '" at ' + when + '.'); }
+    if (!o && rm.b !== xr.b && audOverlap(x.aud, b.aud)) {
+      const gap = x.end <= b.start ? b.start - x.end : x.start >= b.end ? x.start - b.end : 999;
+      if (gap < BUFFER) res.warns.push({ kind: 'buffer', text: 'Only ' + gap + ' min to walk between ' + BUILD[xr.b] + ' and ' + BUILD[rm.b] + ' (about 100 m). "' + x.title + '" is ' + (x.end <= b.start ? 'just before' : 'just after') + '.' });
+    }
+  }
+  return res;
+}
+function roomOnlyOk(b, rm) {
+  return rm.bookable && !rm.out && USE[b.type].includes(rm.type) && b.need <= rm.cap &&
+    !live(b.date, b.ignore).some(x => x.roomId === rm.id && ov(b.start, b.end, x.start, x.end));
+}
+// Ranked free rooms. Scores are explainable, every candidate is validated against live bookings.
+function alternatives(b, prefId, who) {
+  const pref = prefId ? roomById(prefId) : null, out = [];
+  for (const rm of R) {
+    if (!roomOnlyOk(b, rm)) continue;
+    let sc = 100; const why = [];
+    const head = (rm.cap - b.need) / rm.cap;
+    sc -= head * 40;
+    if (head < 0.05) { sc -= 8; why.push('full to capacity'); } else if (head <= 0.35) why.push('seats ' + rm.cap + ' for ' + b.need); else why.push('seats ' + rm.cap + ', larger than needed');
+    if ((rm.type === 'hall' || rm.type === 'library') && b.need < 100) { sc -= 25; why.push('large venue, keep for big groups'); }
+    if (pref) {
+      if (rm.b === pref.b) { sc += 15; if (rm.floor === pref.floor) { sc += 10; why.push('same floor'); } else why.push('same building'); }
+      else { sc -= 5; why.push(BUILD[rm.b] + ', about 100 m away'); }
+    }
+    if (b.aud) {
+      const c = check(Object.assign({}, b, { roomId: rm.id }), b.ignore);
+      if (c.warns.some(w => w.kind === 'buffer')) { sc -= 20; why.push('tight walk between buildings'); }
+    }
+    if (who && needsApproval({ roomId: rm.id, type: b.type }, who)) { sc -= 5; why.push('needs admin approval'); }
+    if (rm.tbc) { sc -= 2; why.push('capacity unconfirmed'); }
+    out.push({ room: rm, score: Math.round(sc), why });
+  }
+  return out.sort((a, c) => c.score - a.score);
+}
+// Other start times the same day when audience, teacher and some room are all free.
+function suggestSlots(b, who) {
+  const dur = b.end - b.start, out = [];
+  for (let st = OPEN; st + dur <= CLOSE; st += 30) {
+    if (st === b.start) continue;
+    const t = Object.assign({}, b, { start: st, end: st + dur });
+    const alt = alternatives(t, b.roomId, who)[0];
+    if (!alt) continue;
+    const c = check(Object.assign({}, t, { roomId: alt.room.id }), b.ignore);
+    if (c.clash.aud.length || c.clash.fac.length) continue;
+    out.push({ start: st, room: alt.room, d: Math.abs(st - b.start) });
+  }
+  return out.sort((a, c) => a.d - c.d).slice(0, 4);
+}
+
+// ---- Notices ----
+function announce(type, title, body, aud, author, bid, replaces) {
+  const n = { id: 'N' + (++S.nseq), type, title, body, aud, author, ts: stamp(), ver: 1, supersededBy: null, bid: bid || '', ackBase: 0, acks: [] };
+  const old = S.notices.filter(x => !x.supersededBy && ((bid && x.bid === bid) || x.id === replaces));
+  old.forEach(o => { o.supersededBy = n.id; n.ver = Math.max(n.ver, o.ver + 1); });
+  S.notices.push(n);
+  audit(author, 'NOTICE_PUBLISHED', type + ': ' + title + ' to ' + audLabel(aud) + (old.length ? ' (replaces ' + old.map(o => o.id).join(', ') + ')' : ''), bid);
+  return n;
+}
+function announceBooking(b, kind, author, extra) {
+  const rm = roomById(b.roomId), when = dlabel(b.date) + ', ' + fmt(b.start) + '-' + fmt(b.end), where = rm.name + ' (' + BUILD[rm.b] + ')';
+  if (kind === 'new') return announce(b.type === 'exam' ? 'Exam notice' : 'Extra class', b.title + ': ' + audLabel(b.aud), when + ' in ' + where + '.' + (b.type === 'exam' ? ' Reach 15 minutes early with your ID card.' : ''), b.aud, author, b.id);
+  if (kind === 'cancel') return announce('Cancellation', 'Cancelled: ' + b.title, when + ' in ' + where + ' is cancelled. Reason: ' + extra + '.', b.aud, author, b.id);
+  return announce('Rescheduled', 'Moved: ' + b.title, 'Was ' + extra + '. Now ' + when + ' in ' + where + '.', b.aud, author, b.id);
+}
+
+// ---- Actions ----
+function createBooking(b, who) {
+  if (!can(who, 'create')) return { ok: false, c: { errors: ['Your role cannot create bookings.'], warns: [], clash: { room: [], aud: [], fac: [] } } };
+  const c = check(b);
+  if (c.errors.length) return { ok: false, c };
+  b.id = 'B' + (++S.seq); b.status = needsApproval(b, who) ? 'pending' : 'confirmed'; b.test = true; b.reports = []; b.history = [];
+  S.bookings.push(b);
+  audit(who.name, 'BOOKING_CREATED', b.title + ' | ' + roomById(b.roomId).name + ' | ' + dlabel(b.date) + ' ' + fmt(b.start) + '-' + fmt(b.end) + ' | ' + audLabel(b.aud) + (b.status === 'pending' ? ' | awaiting admin approval' : ''), b.id);
+  let notice = null;
+  if (b.status === 'confirmed' && ['exam', 'extra', 'practical'].includes(b.type)) notice = announceBooking(b, 'new', who.name);
+  return { ok: true, b, c, notice };
+}
+function cancelBooking(id, who, reason) {
+  const b = S.bookings.find(x => x.id === id);
+  if (!b || !can(who, 'edit', b)) return { ok: false, msg: 'You can only cancel your own extra bookings.' };
+  b.status = 'cancelled'; b.reason = reason;
+  audit(who.name, 'BOOKING_CANCELLED', b.title + ' | ' + dlabel(b.date) + ' ' + fmt(b.start) + ' | reason: ' + reason, b.id);
+  return { ok: true, notice: announceBooking(b, 'cancel', who.name, reason) };
+}
+function rescheduleBooking(id, who, patch) {
+  const b = S.bookings.find(x => x.id === id);
+  if (!b || !can(who, 'edit', b)) return { ok: false, c: { errors: ['You can only move your own extra bookings.'], warns: [], clash: { room: [], aud: [], fac: [] } } };
+  const nb = Object.assign({}, b, patch), c = check(nb, id);
+  if (c.errors.length) return { ok: false, c, nb };
+  const before = dlabel(b.date) + ', ' + fmt(b.start) + '-' + fmt(b.end) + ' in ' + roomById(b.roomId).name;
+  b.history.push(before);
+  Object.assign(b, patch);
+  audit(who.name, 'BOOKING_MOVED', b.title + ' | from ' + before + ' | to ' + dlabel(b.date) + ' ' + fmt(b.start) + '-' + fmt(b.end) + ' in ' + roomById(b.roomId).name, b.id);
+  return { ok: true, c, notice: announceBooking(b, 'move', who.name, before) };
+}
+function approveBooking(id, who) {
+  const b = S.bookings.find(x => x.id === id);
+  if (!b || who.role !== 'admin' || b.status !== 'pending') return null;
+  b.status = 'confirmed';
+  audit(who.name, 'BOOKING_APPROVED', b.title + ' | ' + roomById(b.roomId).name, b.id);
+  return ['exam', 'extra', 'practical'].includes(b.type) ? announceBooking(b, 'new', who.name) : null;
+}
+function addReport(id, who, text) {
+  const b = S.bookings.find(x => x.id === id);
+  if (!b || !can(who, 'report')) return false;
+  b.reports.push({ by: who.name, text, open: true, ts: stamp() });
+  audit(who.name, 'REPORT_FILED', 'Report on "' + b.title + '": ' + text, b.id);
+  return true;
+}
+function resolveReport(id, idx, who) {
+  const b = S.bookings.find(x => x.id === id);
+  if (!b || who.role === 'student' || !b.reports[idx]) return;
+  b.reports[idx].open = false;
+  audit(who.name, 'REPORT_RESOLVED', 'Report on "' + b.title + '" marked resolved', b.id);
+}
+function setRoomOut(id, out, reason, who) {
+  const rm = roomById(id); rm.out = out; rm.outReason = out ? reason : '';
+  audit(who.name, out ? 'ROOM_UNAVAILABLE' : 'ROOM_RESTORED', rm.name + (out ? ' | ' + reason : ''), '');
+  return out ? S.bookings.filter(x => x.roomId === id && x.status !== 'cancelled' && x.date >= NOW).sort((a, c) => (a.date + fmt(a.start)).localeCompare(c.date + fmt(c.start))) : [];
+}
+function ackNotice(id, key) {
+  const n = S.notices.find(x => x.id === id);
+  if (n && !n.acks.includes(key)) n.acks.push(key);
+}
+
+// ---- Natural-language search (rule-based demo; the full build sends this to an LLM that calls the same search) ----
+function parseNL(t) {
+  const s = t.toLowerCase(), o = {};
+  let m = s.match(/(\d{1,3})\s*(students|seats|people|persons|pax|capacity)/) || s.match(/\bfor\s+(\d{1,3})\b(?!\s*(am|pm|:|hour|hr|h\b|min))/);
+  if (m) o.need = Number(m[1]);
+  m = s.match(/(\d+(?:\.\d+)?)\s*(hours?|hrs?|h)\b/);
+  if (m) o.dur = Math.round(parseFloat(m[1]) * 60);
+  else if ((m = s.match(/(\d+)\s*(minutes?|mins?)/))) o.dur = Number(m[1]);
+  m = s.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/);
+  if (m) { let h = Number(m[1]) % 12; if (m[3] === 'pm') h += 12; o.start = pad(h) + ':' + (m[2] || '00'); }
+  else if ((m = s.match(/\bat\s+(\d{1,2}):(\d{2})/))) o.start = pad(Number(m[1])) + ':' + m[2];
+  else if (/after lunch|afternoon/.test(s)) o.start = '14:00';
+  else if (/morning/.test(s)) o.start = '09:00';
+  else if (/noon|midday/.test(s)) o.start = '12:00';
+  if (/tomorrow/.test(s)) o.date = addDays(NOW, 1);
+  else if (/today/.test(s)) o.date = NOW;
+  else if ((m = s.match(/(\d{4}-\d{2}-\d{2})/))) o.date = m[1];
+  else {
+    const names = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const i = names.findIndex(n => s.includes(n) || s.includes(n.slice(0, 3) + ' ') || s.endsWith(n.slice(0, 3)));
+    if (i >= 0) { let d = 1; while (dow(addDays(NOW, d)) !== i) d++; o.date = addDays(NOW, d); }
+  }
+  if (/deeksha|\blh\d*/.test(s)) o.b = 'DB'; else if (/\biet\b/.test(s)) o.b = 'IET';
+  if (/\blab\b|practical/.test(s)) { o.type = 'lab'; o.purpose = 'practical'; }
+  else if (/seminar|\bhall\b/.test(s)) o.type = 'hall';
+  else if (/library/.test(s)) o.type = 'library';
+  if (/\bexam|\btest\b/.test(s)) o.purpose = 'exam';
+  return o;
+}
+
+// ---- Seed: clearly marked test data ----
+(function seed() {
+  const A = (branch, year, section) => ({ branch, year, section });
+  const T = [
+    ['IET17', '09:00', '10:00', A('CSE', 3, 'A'), 'F1', 'Data Structures', [1, 3, 5]],
+    ['IET17', '11:00', '12:00', A('CSE', 3, 'A'), 'F2', 'Operating Systems', [2, 4, 5]],
+    ['IET18', '09:00', '10:00', A('CSE', 3, 'B'), 'F3', 'Database Systems', [1, 3, 5]],
+    ['IET18', '10:00', '11:00', A('CSE', 3, 'B'), 'F4', 'Computer Networks', [2, 4, 5]],
+    ['IET19', '10:00', '12:00', A('AIML', 2, 'A'), 'F5', 'Machine Learning', [1, 2, 3, 4, 5]],
+    ['IET20', '09:00', '11:00', A('ECE', 2, 'All'), 'F2', 'Signals and Systems', [1, 2, 3, 4, 5]],
+    ['IET24', '10:00', '12:00', A('ME', 3, 'All'), 'F1', 'Thermodynamics', [1, 2, 3, 4, 5]],
+    ['IET25', '09:00', '11:00', A('IT', 2, 'All'), 'F6', 'Web Technologies', [1, 2, 3, 4, 5]],
+    ['IET28', '12:00', '14:00', A('AIDS', 3, 'All'), 'F7', 'Data Mining', [1, 3, 5]],
+    ['IET29', '13:00', '14:00', A('AIML', 3, 'B'), 'F5', 'Deep Learning', [1, 2, 3, 4, 5]],
+    ['IET30', '11:00', '13:00', A('CSE', 1, 'A'), 'F8', 'Engineering Mathematics', [1, 2, 3, 4, 5]],
+    ['IET32', '14:00', '16:00', A('CSE', 4, 'All'), 'F2', 'Guest lecture', [3]],
+    ['IET22', '14:00', '16:00', A('CSE', 2, 'A'), 'F3', 'Programming Lab', [2, 4]],
+    ['LH01', '09:00', '11:00', A('CSE', 1, 'B'), 'F8', 'Engineering Physics', [1, 2, 3, 4, 5]],
+    ['LH02', '10:00', '12:00', A('AIML', 1, 'A'), 'F4', 'Programming Fundamentals', [1, 3]],
+    ['LH03', '09:00', '10:00', A('AIDS', 1, 'All'), 'F7', 'Basic Electronics', [1, 2, 3, 4, 5]],
+    ['LH05', '11:00', '13:00', A('ECE', 1, 'All'), 'F6', 'Circuit Theory', [2, 4, 5]]
+  ];
+  for (let d = '2026-11-02'; d <= '2026-11-13'; d = addDays(d, 1)) {
+    const w = dow(d);
+    T.forEach(t => { if (t[6].includes(w)) S.bookings.push({ id: 'B' + (++S.seq), roomId: t[0], date: d, start: toMin(t[1]), end: toMin(t[2]), type: 'timetable', title: t[5], aud: t[3], facId: t[4], need: audSize(t[3]), status: 'confirmed', test: true, reports: [], history: [] }); });
+  }
+  const ex = { id: 'B' + (++S.seq), roomId: 'IET32', date: '2026-11-07', start: toMin('09:00'), end: toMin('11:00'), type: 'exam', title: 'NSS Minor Exam', aud: A('CSE', 1, 'All'), facId: 'ADMIN', need: 150, status: 'confirmed', test: true, reports: [], history: [] };
+  S.bookings.push(ex);
+  audit('System (seed)', 'TEST_DATA_LOADED', S.bookings.length + ' sample bookings loaded. All data in this prototype is test data.', '');
+  const n1 = announce('Exam notice', 'NSS Minor Exam: CSE Year 1', 'Sat 7 Nov, 09:00-11:00 in IET32 Seminar Hall (IET). Reach 15 minutes early with your ID card.', ex.aud, 'Exam Cell', ex.id);
+  n1.ackBase = 61;
+  const n2 = announce('General', 'Check RoomSync for room changes', 'Room and exam changes are published here first. Notices on WhatsApp or paper may be out of date.', { branch: 'ALL', year: 0, section: 'All' }, 'Exam Cell', '');
+  n2.ackBase = 412;
+})();
+
+// ===== UI =====
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const U = { role: 'faculty', userId: 'F7', groupKey: 'CSE-3-A', tab: 'rooms', sel: null, mode: 'mine', modal: null, outInfo: null,
+  f: { b: 'ANY', floor: 'ANY', date: '2026-11-06', start: '11:00', dur: 60, need: 70, type: 'ANY', purpose: 'extra' }, nl: '', nlMsg: '' };
+const TABS = ['rooms', 'schedule', 'notices', 'audit', 'admin'];
+const grp = () => GROUPS.find(g => g.key === U.groupKey);
+const who = () => U.role === 'admin' ? { role: 'admin', id: 'ADMIN', name: 'Exam Cell (admin)' }
+  : U.role === 'faculty' ? { role: 'faculty', id: U.userId, name: facName(U.userId) }
+  : { role: 'student', id: U.groupKey, name: 'Student, ' + groupLabel(grp()) };
+const meKey = () => U.groupKey + ':you';
+const timeOpts = (sel, from, to) => { let o = ''; for (let m = from; m <= to; m += 30) o += '<option value="' + fmt(m) + '"' + (fmt(m) === sel ? ' selected' : '') + '>' + fmt(m) + '</option>'; return o; };
+const DURS = [30, 60, 90, 120, 180];
+const durOpts = sel => DURS.map(d => '<option value="' + d + '"' + (d === Number(sel) ? ' selected' : '') + '>' + (d < 60 ? d + ' min' : (d / 60) + (d === 60 ? ' hour' : ' hours')) + '</option>').join('');
+const roomOpts = (sel, only) => ['IET', 'DB'].map(b => '<optgroup label="' + BUILD[b] + '">' + R.filter(r => r.b === b && r.bookable && (!only || only(r))).map(r => '<option value="' + r.id + '"' + (r.id === sel ? ' selected' : '') + '>' + esc(r.name) + ' (' + r.cap + (r.out ? ', unavailable' : '') + ')</option>').join('') + '</optgroup>').join('');
+function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('on'), 3200); }
+
+// ---- Layouts traced from the blueprints (x, y, w, h in a 700 x 200 box) ----
+const LAYOUT = {
+  IET: {
+    0: { label: 'Ground floor', rooms: [['IET-LIB', 10, 10, 300, 70], ['IET-TO', 10, 90, 300, 70], ['IET-PC', 380, 10, 310, 70], ['IET-DIR', 380, 90, 310, 70]], stairs: [[322, 10, 46, 150]] },
+    1: { label: 'First floor', rooms: [['IET22', 10, 10, 140, 70], ['IET16', 155, 10, 150, 70], ['IET14', 380, 10, 150, 70], ['IET15', 535, 10, 155, 70], ['IET20', 10, 90, 165, 70], ['IET19', 180, 90, 165, 70], ['IET18', 350, 90, 165, 70], ['IET17', 520, 90, 170, 70]], stairs: [[312, 10, 60, 70]] },
+    2: { label: 'Second floor', rooms: [['IET32', 10, 10, 300, 70], ['IET24', 380, 10, 150, 70], ['IET25', 535, 10, 155, 70], ['IET30', 10, 90, 165, 70], ['IET29', 180, 90, 165, 70], ['IET28', 350, 90, 165, 70], ['IET23', 520, 90, 170, 70]], stairs: [[320, 10, 50, 70]] }
+  },
+  DB: {
+    0: { label: 'Ground floor', rooms: [['LH01', 150, 6, 400, 34], ['LH02', 150, 44, 400, 34], ['LH03', 60, 86, 120, 56], ['LH04', 186, 86, 120, 56], ['LH05', 560, 86, 130, 56], ['LH06', 10, 150, 140, 40], ['LH07', 470, 150, 220, 40]], stairs: [[330, 86, 44, 104]] },
+    1: { label: 'First floor', rooms: [['LH08', 150, 6, 400, 34], ['LH09', 150, 44, 400, 34], ['LH10', 60, 86, 120, 56], ['LH11', 186, 86, 120, 56], ['LH12', 560, 86, 130, 56], ['LH13', 10, 150, 140, 40], ['LH14', 470, 150, 220, 40]], stairs: [[330, 86, 44, 104]] }
+  }
+};
+const FLOORN = { 0: 'Ground', 1: 'First', 2: 'Second' };
+
+// ---- Search state ----
+function cur() { const f = U.f, s = toMin(f.start); return { date: f.date, start: s, end: s + Number(f.dur), type: f.purpose, need: Number(f.need) || 1, aud: null, facId: null }; }
+function rstate(rm, c) {
+  if (!rm.bookable) return ['off', 'not bookable'];
+  if (rm.out) return ['out', 'unavailable'];
+  if (live(c.date).some(x => x.roomId === rm.id && ov(c.start, c.end, x.start, x.end))) return ['busy', 'busy'];
+  if (!USE[c.type].includes(rm.type)) return ['na', 'n/a'];
+  if (rm.cap < c.need) return ['small', 'too small'];
+  return ['free', 'free'];
+}
+const inFilter = rm => (U.f.b === 'ANY' || rm.b === U.f.b) && (U.f.floor === 'ANY' || String(rm.floor) === U.f.floor) && (U.f.type === 'ANY' || rm.type === U.f.type);
+
+function mapSVG(c) {
+  let out = '';
+  ['IET', 'DB'].forEach(b => {
+    if (U.f.b !== 'ANY' && U.f.b !== b) return;
+    Object.keys(LAYOUT[b]).forEach(fl => {
+      if (U.f.floor !== 'ANY' && U.f.floor !== fl) return;
+      const L = LAYOUT[b][fl];
+      let s = '<div class="fl"><h3><b>' + BUILD[b] + '</b> · ' + L.label + '</h3><svg class="map" viewBox="0 0 700 200" role="group" aria-label="' + BUILD[b] + ' ' + L.label + ' floor plan">';
+      L.stairs.forEach(st => { s += '<g class="stair"><rect x="' + st[0] + '" y="' + st[1] + '" width="' + st[2] + '" height="' + st[3] + '"/>'; for (let y = st[1] + 8; y < st[1] + st[3]; y += 8) s += '<line x1="' + st[0] + '" x2="' + (st[0] + st[2]) + '" y1="' + y + '" y2="' + y + '"/>'; s += '</g>'; });
+      L.rooms.forEach(r => {
+        const rm = roomById(r[0]), [k, lab] = rstate(rm, c), cx = r[1] + r[3] / 2, one = r[4] < 45;
+        const cap = rm.bookable ? ' · ' + rm.cap : '';
+        const label = rm.name + ', ' + lab + (rm.bookable ? ', ' + rm.cap + ' seats' : '');
+        s += '<g class="room ' + k + (U.sel === rm.id ? ' selected' : '') + '" data-action="pick" data-room="' + rm.id + '" tabindex="0" role="button" aria-label="' + esc(label) + '"><rect x="' + r[1] + '" y="' + r[2] + '" width="' + r[3] + '" height="' + r[4] + '" rx="3"/>';
+        if (one) s += '<text class="rn" x="' + cx + '" y="' + (r[2] + r[4] / 2 + 4) + '" text-anchor="middle">' + esc(rm.name) + '<tspan class="rs" dx="6">' + lab + cap + '</tspan></text>';
+        else s += '<text class="rn" x="' + cx + '" y="' + (r[2] + r[4] / 2 - 2) + '" text-anchor="middle">' + esc(rm.name) + '</text><text class="rs" x="' + cx + '" y="' + (r[2] + r[4] / 2 + 13) + '" text-anchor="middle">' + lab + cap + '</text>';
+        s += '</g>';
+      });
+      out += s + '</svg></div>';
+    });
+  });
+  return out || '<p class="muted">No floors match these filters.</p>';
+}
+function timeline(rm, c) {
+  const bs = live(c.date).filter(x => x.roomId === rm.id), span = CLOSE - OPEN;
+  let s = '<div class="tl" role="img" aria-label="Day timeline for ' + esc(rm.name) + '">';
+  bs.forEach(x => { s += '<div class="blk" style="left:' + (x.start - OPEN) / span * 100 + '%;width:' + (x.end - x.start) / span * 100 + '%" title="' + esc(x.title) + '">' + esc(x.title) + '</div>'; });
+  s += '<div class="win" style="left:' + Math.max(0, (c.start - OPEN) / span * 100) + '%;width:' + Math.min(100, (c.end - c.start) / span * 100) + '%"></div></div><div class="ticks">';
+  for (let h = 9; h <= 17; h += 2) s += '<span>' + pad(h) + ':00</span>';
+  return s + '</div>';
+}
+function selPanel(c) {
+  if (!U.sel) return '<div class="panel"><h2>Day view</h2><p class="muted">Select a room on the map to see its day. The dashed block is your requested window.</p></div>';
+  const rm = roomById(U.sel), [k, lab] = rstate(rm, c);
+  const bs = live(c.date).filter(x => x.roomId === rm.id).sort((a, b) => a.start - b.start);
+  return '<div class="panel"><h2>' + esc(rm.name) + ' <span class="chip ' + (k === 'free' ? 'ok' : k === 'busy' ? 'bad' : k === 'small' ? 'warn' : '') + '">' + lab + '</span></h2><div class="small muted">' + BUILD[rm.b] + ', ' + roomLabel(rm) + (rm.bookable ? ', ' + rm.cap + ' seats' : '') + (rm.note ? ' · ' + esc(rm.note) : '') + '</div>'
+    + (rm.bookable ? timeline(rm, c) + '<ul class="small" style="margin:8px 0 0;padding-left:18px">' + (bs.length ? bs.map(x => '<li><span class="mono">' + fmt(x.start) + '-' + fmt(x.end) + '</span> ' + esc(x.title) + ', ' + esc(audLabel(x.aud)) + (x.status === 'pending' ? ' (pending)' : '') + '</li>').join('') : '<li>No bookings on ' + dlabel(c.date) + '</li>') + '</ul>' : '')
+    + (rm.bookable && U.role !== 'student' ? '<div class="row" style="margin-top:10px"><button class="btn primary sm" data-action="book" data-room="' + rm.id + '">Book ' + esc(rm.name) + '</button></div>' : '') + '</div>';
+}
+
+function viewRooms() {
+  const f = U.f, c = cur();
+  const res = alternatives(c, null, who()).filter(a => inFilter(a.room));
+  const filt = '<div class="panel"><h2>Find a room</h2><div class="stack">'
+    + '<div><label for="nl">Describe what you need</label><div class="nl"><input type="text" id="nl" value="' + esc(U.nl) + '" placeholder="70 students tomorrow after lunch, 2 hours"><button class="btn" data-action="nl">Fill</button></div><div class="hint" id="nlmsg">' + (U.nlMsg ? esc(U.nlMsg) : 'Rule-based here. The full build sends this to an LLM that calls the same search.') + '</div></div>'
+    + '<div class="grid2"><div><label for="f-b">Building</label><select id="f-b" data-f="b"><option value="ANY">Both buildings</option><option value="IET"' + (f.b === 'IET' ? ' selected' : '') + '>IET</option><option value="DB"' + (f.b === 'DB' ? ' selected' : '') + '>Deeksha Bhawan</option></select></div>'
+    + '<div><label for="f-floor">Floor</label><select id="f-floor" data-f="floor"><option value="ANY">Any floor</option>' + [0, 1, 2].map(n => '<option value="' + n + '"' + (f.floor === String(n) ? ' selected' : '') + '>' + FLOORN[n] + '</option>').join('') + '</select></div></div>'
+    + '<div class="grid2"><div><label for="f-date">Date</label><input type="date" id="f-date" data-f="date" value="' + f.date + '"></div>'
+    + '<div><label for="f-start">Start</label><select id="f-start" data-f="start">' + timeOpts(f.start, OPEN, CLOSE - 30) + '</select></div></div>'
+    + '<div class="grid3"><div><label for="f-dur">Duration</label><select id="f-dur" data-f="dur">' + durOpts(f.dur) + '</select></div>'
+    + '<div><label for="f-need">Seats</label><input type="number" id="f-need" data-f="need" min="1" max="250" value="' + f.need + '"></div>'
+    + '<div><label for="f-type">Room type</label><select id="f-type" data-f="type">' + [['ANY', 'Any'], ['class', 'Classroom'], ['lab', 'Lab'], ['hall', 'Seminar hall'], ['library', 'Library']].map(o => '<option value="' + o[0] + '"' + (f.type === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select></div></div>'
+    + '<div><label for="f-purpose">Purpose</label><select id="f-purpose" data-f="purpose">' + ['extra', 'exam', 'practical', 'event'].map(p => '<option value="' + p + '"' + (f.purpose === p ? ' selected' : '') + '>' + TL[p] + '</option>').join('') + '</select></div>'
+    + '</div></div>';
+  const list = '<div class="panel"><h2>' + res.length + ' room' + (res.length === 1 ? '' : 's') + ' free, best fit first</h2><div class="hint">' + dlabel(f.date) + ', ' + fmt(c.start) + '-' + fmt(c.end) + ' · ' + c.need + ' seats</div><div class="res">'
+    + (res.length ? res.slice(0, 8).map(a => '<div class="item' + (U.sel === a.room.id ? ' sel' : '') + '"><div class="hd"><b>' + esc(a.room.name) + '</b><span class="chip">' + BUILD[a.room.b] + ', ' + FLOORN[a.room.floor] + '</span></div><div class="small muted">' + esc(a.why.join(' · ')) + '</div><div class="row"><button class="btn sm" data-action="pick" data-room="' + a.room.id + '">Show on map</button>' + (U.role !== 'student' ? '<button class="btn primary sm" data-action="book" data-room="' + a.room.id + '">Book</button>' : '') + '</div></div>').join('') : '<p class="muted">Nothing is free with these filters. Try a different time, a shorter duration or the other building.</p>')
+    + '</div>' + (U.role === 'student' ? '<p class="hint">Students can look at availability. Only faculty and admins can book.</p>' : '') + '</div>';
+  const map = '<div class="panel"><h2>Floor plans</h2><div class="legend"><span><i style="border-color:var(--free);background:var(--free-bg)"></i>Free</span><span><i style="border-color:var(--busy);background:var(--busy-bg)"></i>Busy</span><span><i style="border-color:var(--warn);background:var(--warn-bg)"></i>Too small</span><span><i style="border-color:var(--line);background:var(--off-bg);border-style:dashed"></i>Not usable for this purpose</span></div>' + mapSVG(c) + '</div>';
+  return '<div class="cols"><div>' + filt + list + '</div><div>' + map + selPanel(c) + '</div></div>';
+}
+
+// ---- Schedule ----
+function bookingCard(b) {
+  const rm = roomById(b.roomId), w = who(), open = b.reports.filter(r => r.open);
+  const acts = [];
+  if (b.status !== 'cancelled') {
+    if (w.role === 'student') acts.push('<button class="btn sm" data-action="open-report" data-b="' + b.id + '">Report a problem</button>');
+    else {
+      if (can(w, 'edit', b)) acts.push('<button class="btn sm" data-action="open-move" data-b="' + b.id + '">Move</button><button class="btn sm danger" data-action="open-cancel" data-b="' + b.id + '">Cancel</button>');
+      if (w.role === 'admin' && b.status === 'pending') acts.push('<button class="btn sm primary" data-action="approve" data-b="' + b.id + '">Approve</button>');
+    }
+  }
+  const hist = S.audit.filter(e => e.bid === b.id);
+  return '<div class="card ' + b.status + '"><div class="hd"><span class="tm">' + fmt(b.start) + '-' + fmt(b.end) + '</span><span class="t">' + esc(b.title) + '</span>'
+    + '<span class="chip">' + TL[b.type] + '</span>' + (b.status === 'pending' ? '<span class="chip warn">Awaiting approval</span>' : '') + (b.status === 'cancelled' ? '<span class="chip bad">Cancelled</span>' : '') + (open.length ? '<span class="chip warn">Under review</span>' : '') + '</div>'
+    + '<div class="meta"><span>' + esc(rm.name) + ', ' + BUILD[rm.b] + '</span><span>' + esc(audLabel(b.aud)) + '</span><span>' + esc(facName(b.facId)) + '</span></div>'
+    + (b.reason ? '<div class="small">Reason: ' + esc(b.reason) + '</div>' : '')
+    + (b.history.length ? '<div class="small muted">Moved from: ' + esc(b.history[b.history.length - 1]) + '</div>' : '')
+    + (open.length && w.role !== 'student' ? '<div class="msg warn small">' + open.map(r => esc(r.by) + ': ' + esc(r.text) + ' <button class="btn sm" data-action="resolve" data-b="' + b.id + '" data-i="' + b.reports.indexOf(r) + '">Resolve</button>').join('<br>') + '</div>' : '')
+    + (acts.length ? '<div class="act">' + acts.join('') + '</div>' : '')
+    + (hist.length && w.role !== 'student' ? '<details><summary>History (' + hist.length + ')</summary><ul>' + hist.map(e => '<li><span class="mono">' + esc(e.ts) + '</span> ' + esc(e.action.replace(/_/g, ' ').toLowerCase()) + ' by ' + esc(e.actor) + '</li>').join('') + '</ul></details>' : '') + '</div>';
+}
+function viewSchedule() {
+  const w = who(), ws = weekStart(U.f.date);
+  let days = '';
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(ws, i);
+    let bs = S.bookings.filter(b => b.date === d);
+    if (w.role === 'student') bs = bs.filter(b => audOverlap(b.aud, grp()));
+    else if (U.mode === 'mine' && w.role === 'faculty') bs = bs.filter(b => b.facId === w.id);
+    bs.sort((a, c) => a.start - c.start);
+    if (!bs.length && i > 4) continue;
+    days += '<div class="day"><h3>' + dlabel(d) + '</h3>' + (bs.length ? bs.map(bookingCard).join('') : '<p class="muted small">Nothing scheduled.</p>') + '</div>';
+  }
+  const ctl = '<div class="panel"><div class="row" style="justify-content:space-between"><h2 style="margin:0">' + (w.role === 'student' ? 'My schedule: ' + esc(groupLabel(grp())) : 'Schedule') + '</h2><div class="row">'
+    + (w.role !== 'student' ? '<select id="f-mode" data-m="mode" aria-label="Which bookings"><option value="mine"' + (U.mode === 'mine' ? ' selected' : '') + '>My bookings</option><option value="all"' + (U.mode === 'all' ? ' selected' : '') + '>Everyone</option></select>' : '')
+    + '<input type="date" id="f-date2" data-f="date" value="' + U.f.date + '" aria-label="Week containing"></div></div><div class="hint">Week of ' + dlabel(ws) + '. Cancelled and moved items stay visible so nobody is caught out.</div></div>';
+  return ctl + '<div style="margin-top:16px">' + days + '</div>';
+}
+
+// ---- Notices ----
+function viewNotices() {
+  const w = who();
+  let ns = S.notices.slice().reverse();
+  if (w.role === 'student') ns = ns.filter(n => matchAud(n.aud, grp()));
+  const pub = w.role !== 'student' ? '<details class="panel"><summary>Publish a notice</summary><div class="stack" style="margin-top:10px">'
+    + '<div class="grid2"><div><label for="n-type">Type</label><select id="n-type">' + ['General', 'Exam notice', 'Cancellation', 'Rescheduled', 'Extra class'].map(t => '<option>' + t + '</option>').join('') + '</select></div><div><label for="n-rep">Replaces earlier notice</label><select id="n-rep"><option value="">None</option>' + S.notices.filter(n => !n.supersededBy).map(n => '<option value="' + n.id + '">' + esc(n.title) + '</option>').join('') + '</select></div></div>'
+    + '<div><label for="n-title">Title</label><input type="text" id="n-title"></div><div><label for="n-body">Details</label><textarea id="n-body" placeholder="Date, time, venue and what students need to do"></textarea></div>'
+    + '<div class="grid3"><div><label for="n-b">Branch</label><select id="n-b"><option value="ALL">All branches</option>' + BRANCHES.map(b => '<option value="' + b.k + '">' + b.n + '</option>').join('') + '</select></div><div><label for="n-y">Year</label><select id="n-y"><option value="0">All years</option>' + [1, 2, 3, 4].map(y => '<option value="' + y + '">Year ' + y + '</option>').join('') + '</select></div><div><label for="n-s">Section</label><select id="n-s"><option>All</option><option>A</option><option>B</option></select></div></div>'
+    + '<div><button class="btn primary" data-action="publish">Publish</button></div></div></details>' : '';
+  const list = ns.map(n => {
+    const tgt = audSize(n.aud), got = n.ackBase + n.acks.length, mine = n.acks.includes(meKey());
+    return '<div class="card notice' + (n.supersededBy ? ' sup' : '') + '"><div class="hd"><span class="chip ' + (n.type === 'Cancellation' ? 'bad' : n.type === 'Rescheduled' ? 'warn' : n.type === 'Exam notice' ? 'info' : '') + '">' + esc(n.type) + '</span><span class="t">' + esc(n.title) + '</span>' + (n.ver > 1 ? '<span class="chip">Version ' + n.ver + '</span>' : '') + (n.supersededBy ? '<span class="chip bad">Superseded by ' + n.supersededBy + '</span>' : '<span class="chip ok">Current</span>') + '</div>'
+      + '<p>' + esc(n.body) + '</p><div class="meta"><span>To: ' + esc(audLabel(n.aud)) + '</span><span>By ' + esc(n.author) + '</span><span class="mono">' + esc(n.ts) + '</span></div>'
+      + '<div class="row small">' + (w.role === 'student' ? (n.supersededBy ? '' : mine ? '<span class="chip ok">You acknowledged this</span>' : '<button class="btn sm primary" data-action="ack" data-n="' + n.id + '">I have seen this</button>') : '<span><b class="mono">' + got + '</b> of <b class="mono">' + tgt + '</b> students acknowledged</span>') + '</div></div>';
+  }).join('') || '<p class="muted">No notices for your group.</p>';
+  return pub + '<div style="margin-top:14px">' + list + '</div>';
+}
+
+// ---- Audit ----
+function viewAudit() {
+  const v = U.verify ? '<span class="chip ' + (U.verify.ok ? 'ok' : 'bad') + '">' + (U.verify.ok ? 'Chain verified: ' + U.verify.n + ' entries, none altered' : 'Chain broken at entry ' + U.verify.at) + '</span>' : '';
+  return '<div class="panel"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Audit trail</h2><div class="row">' + v + '<button class="btn sm" data-action="verify">Verify chain</button></div></div><p class="hint">Entries are append-only. Each carries a hash of the entry before it, so a later edit would break the chain.</p>'
+    + '<div class="tw"><table><thead><tr><th>#</th><th>When</th><th>Who</th><th>What</th><th>Details</th><th>Hash</th></tr></thead><tbody>'
+    + S.audit.slice().reverse().map(e => '<tr><td class="mono">' + e.n + '</td><td class="mono">' + esc(e.ts) + '</td><td>' + esc(e.actor) + '</td><td>' + esc(e.action.replace(/_/g, ' ').toLowerCase()) + '</td><td>' + esc(e.text) + '</td><td class="mono">' + e.hash + '</td></tr>').join('') + '</tbody></table></div></div>';
+}
+
+// ---- Admin ----
+function viewAdmin() {
+  const pend = S.bookings.filter(b => b.status === 'pending'), reps = S.bookings.filter(b => b.reports.some(r => r.open));
+  const aff = U.outInfo ? '<div class="msg warn"><b>' + esc(roomById(U.outInfo.id).name) + ' is now unavailable.</b> ' + (U.outInfo.list.length ? U.outInfo.list.length + ' upcoming booking(s) are affected. Suggested replacements:' : 'No upcoming bookings are affected.')
+    + '<ul>' + U.outInfo.list.slice(0, 8).map(b => { const a = alternatives(Object.assign({}, b, { ignore: b.id }), b.roomId, who())[0]; return '<li>' + dlabel(b.date) + ' ' + fmt(b.start) + ' ' + esc(b.title) + ' → ' + (a ? esc(a.room.name) + ' <button class="btn sm" data-action="move-to" data-b="' + b.id + '" data-room="' + a.room.id + '">Move there</button>' : 'no free room') + '</li>'; }).join('') + '</ul></div>' : '';
+  return '<div class="cols"><div><div class="panel"><h2>Waiting for approval (' + pend.length + ')</h2>' + (pend.length ? pend.map(bookingCard).join('') : '<p class="muted small">Library and seminar-hall events from faculty appear here.</p>') + '</div>'
+    + '<div class="panel"><h2>Open student reports (' + reps.length + ')</h2>' + (reps.length ? reps.map(bookingCard).join('') : '<p class="muted small">No open reports.</p>') + '</div></div>'
+    + '<div><div class="panel"><h2>Rooms</h2>' + aff + '<div class="tw"><table><thead><tr><th>Room</th><th>Building</th><th>Seats</th><th>Status</th><th></th></tr></thead><tbody>'
+    + R.filter(r => r.bookable).map(r => '<tr><td>' + esc(r.name) + (r.tbc ? ' <span class="chip warn">to confirm</span>' : '') + '</td><td>' + BUILD[r.b] + '</td><td class="mono">' + r.cap + '</td><td>' + (r.out ? '<span class="chip bad">Unavailable</span>' : '<span class="chip ok">In service</span>') + '</td><td><button class="btn sm" data-action="toggle-room" data-room="' + r.id + '">' + (r.out ? 'Restore' : 'Mark unavailable') + '</button></td></tr>').join('') + '</tbody></table></div></div></div></div>';
+}
+
+// ---- Modals ----
+function audFields(a, need) {
+  return '<div class="grid3"><div><label for="m-branch">Branch</label><select id="m-branch" data-m="aud">' + BRANCHES.map(b => '<option value="' + b.k + '"' + (a.branch === b.k ? ' selected' : '') + '>' + b.n + '</option>').join('') + '</select></div>'
+    + '<div><label for="m-year">Year</label><select id="m-year" data-m="aud">' + [1, 2, 3, 4].map(y => '<option value="' + y + '"' + (a.year === y ? ' selected' : '') + '>Year ' + y + '</option>').join('') + '</select></div>'
+    + '<div><label for="m-sec">Section</label><select id="m-sec" data-m="aud">' + secOpts(a.branch, a.section) + '</select></div></div>'
+    + '<div><label for="m-need">Students attending</label><input type="number" id="m-need" min="1" max="250" value="' + need + '"></div>';
+}
+const secOpts = (br, sel) => { const secs = BRANCHES.find(b => b.k === br).secs; return (secs.length > 1 ? ['All'].concat(secs) : secs).map(s => '<option value="' + s + '"' + (s === sel ? ' selected' : '') + '>' + (s === 'All' ? (secs.length > 1 ? 'Whole year' : 'Whole year') : 'Section ' + s) + '</option>').join(''); };
+function openModal(m) {
+  U.modal = m; const w = who(); let h = '';
+  if (m.kind === 'book') {
+    const c = cur(), a = { branch: 'AIML', year: 4, section: 'A' };
+    h = '<h2 id="mt">Book a room</h2><div class="stack"><div><label for="m-room">Room</label><select id="m-room">' + roomOpts(m.room) + '</select></div>'
+      + '<div class="grid2"><div><label for="m-type">Purpose</label><select id="m-type">' + ['extra', 'exam', 'practical', 'event'].map(p => '<option value="' + p + '"' + (U.f.purpose === p ? ' selected' : '') + '>' + TL[p] + '</option>').join('') + '</select></div><div><label for="m-title">Title</label><input type="text" id="m-title" value="Extra class"></div></div>'
+      + audFields(a, c.need)
+      + (w.role === 'admin' ? '<div><label for="m-fac">Faculty</label><select id="m-fac">' + FAC.map(f => '<option value="' + f.id + '">' + esc(f.name) + '</option>').join('') + '</select></div>' : '<div class="hint">Booking as ' + esc(w.name) + '</div>')
+      + '<div class="grid3"><div><label for="m-date">Date</label><input type="date" id="m-date" value="' + U.f.date + '"></div><div><label for="m-start">Start</label><select id="m-start">' + timeOpts(U.f.start, OPEN, CLOSE - 30) + '</select></div><div><label for="m-dur">Duration</label><select id="m-dur">' + durOpts(U.f.dur) + '</select></div></div>'
+      + '<div id="m-res"></div><div class="row"><button class="btn primary" data-action="submit" id="m-go">Check and book</button><button class="btn" data-action="close">Close</button></div></div>';
+  } else if (m.kind === 'move') {
+    const b = S.bookings.find(x => x.id === m.id);
+    h = '<h2 id="mt">Move "' + esc(b.title) + '"</h2><div class="stack"><div class="hint">Now: ' + dlabel(b.date) + ', ' + fmt(b.start) + '-' + fmt(b.end) + ' in ' + esc(roomById(b.roomId).name) + '. Students will be told what changed.</div>'
+      + '<div><label for="m-room">Room</label><select id="m-room">' + roomOpts(b.roomId) + '</select></div>'
+      + '<div class="grid3"><div><label for="m-date">Date</label><input type="date" id="m-date" value="' + b.date + '"></div><div><label for="m-start">Start</label><select id="m-start">' + timeOpts(fmt(b.start), OPEN, CLOSE - 30) + '</select></div><div><label for="m-dur">Duration</label><select id="m-dur">' + durOpts(b.end - b.start) + '</select></div></div>'
+      + '<div id="m-res"></div><div class="row"><button class="btn primary" data-action="submit">Check and move</button><button class="btn" data-action="close">Close</button></div></div>';
+  } else if (m.kind === 'cancel') {
+    h = '<h2 id="mt">Cancel booking</h2><div class="stack"><div><label for="m-reason">Reason students will see</label><textarea id="m-reason" placeholder="For example: faculty on leave"></textarea></div><div id="m-res"></div><div class="row"><button class="btn danger" data-action="submit">Cancel booking</button><button class="btn" data-action="close">Keep it</button></div></div>';
+  } else if (m.kind === 'report') {
+    h = '<h2 id="mt">Report a problem</h2><div class="stack"><p class="hint" style="margin:0">Your note goes to the faculty member and the admin. It does not change the booking.</p><div><label for="m-text">What looks wrong?</label><textarea id="m-text" placeholder="For example: this room is also used by another class at this time"></textarea></div><div id="m-res"></div><div class="row"><button class="btn primary" data-action="submit">Send report</button><button class="btn" data-action="close">Close</button></div></div>';
+  }
+  $('#modal').innerHTML = '<div class="scrim"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="mt">' + h + '</div></div>';
+  const first = $('#modal select, #modal textarea, #modal input'); if (first) first.focus();
+}
+const closeModal = () => { U.modal = null; $('#modal').innerHTML = ''; };
+const v = id => { const e = $('#' + id); return e ? e.value : ''; };
+
+function showResult(r, kindWord) {
+  const c = r.c, el = $('#m-res'); let h = '';
+  if (r.ok) {
+    h += '<div class="msg good"><b>' + kindWord + '.</b>' + (r.b && r.b.status === 'pending' ? ' It needs admin approval before it is final.' : '') + (r.notice ? ' Students in ' + esc(audLabel(r.notice.aud)) + ' (' + audSize(r.notice.aud) + ') have been notified.' : '') + '</div>';
+    if (c && c.warns.length) h += '<div class="msg warn" style="margin-top:8px"><ul>' + c.warns.map(x => '<li>' + esc(x.text) + '</li>').join('') + '</ul></div>';
+    el.innerHTML = h; const go = $('#m-go'); if (go) go.disabled = true; return;
+  }
+  h += '<div class="msg bad"><b>Cannot book this.</b><ul>' + c.errors.map(e => '<li>' + esc(e) + '</li>').join('') + '</ul></div>';
+  const b = r.attempt;
+  if (b) {
+    const roomProblem = c.clash.room.length || c.errors.some(e => /seats|cannot be held|unavailable|not a bookable/.test(e));
+    const alts = alternatives(Object.assign({}, b, { ignore: b.ignore }), b.roomId, who()).filter(a => a.room.id !== b.roomId).slice(0, 4);
+    const ok = !c.clash.aud.length && !c.clash.fac.length;
+    if (roomProblem && ok) h += '<div style="margin-top:10px"><b class="small">Free rooms at this time</b><div class="res">' + (alts.length ? alts.map(a => '<div class="item"><div class="hd"><b>' + esc(a.room.name) + '</b><span class="chip">' + BUILD[a.room.b] + '</span></div><div class="small muted">' + esc(a.why.join(' · ')) + '</div><div><button class="btn sm primary" data-action="use-room" data-room="' + a.room.id + '">Book this instead</button></div></div>').join('') : '<p class="muted small">No other room is free then.</p>') + '</div></div>';
+    if (!ok || !alts.length) {
+      const sl = suggestSlots(b, who());
+      h += '<div style="margin-top:10px"><b class="small">Other times today that work for everyone</b><div class="row" style="margin-top:6px">' + (sl.length ? sl.map(s => '<button class="btn sm" data-action="use-slot" data-start="' + fmt(s.start) + '" data-room="' + s.room.id + '">' + fmt(s.start) + ' in ' + esc(s.room.name) + '</button>').join('') : '<span class="muted small">No common free time on this date.</span>') + '</div></div>';
+    }
+  }
+  el.innerHTML = h;
+}
+function collect(kind) {
+  const w = who(), start = toMin(v('m-start')), end = start + Number(v('m-dur'));
+  if (kind === 'book') {
+    const aud = { branch: v('m-branch'), year: Number(v('m-year')), section: v('m-sec') };
+    return { roomId: v('m-room'), date: v('m-date'), start, end, type: v('m-type'), title: v('m-title').trim() || TL[v('m-type')], aud, facId: w.role === 'admin' ? v('m-fac') : w.id, need: Number(v('m-need')) || 1 };
+  }
+  return { roomId: v('m-room'), date: v('m-date'), start, end };
+}
+function submitModal() {
+  const m = U.modal, w = who(); if (!m) return;
+  if (m.kind === 'book') {
+    const b = collect('book'), r = createBooking(Object.assign({}, b), w);
+    r.attempt = b; showResult(r, 'Booked ' + roomById(b.roomId).name + ', ' + dlabel(b.date) + ' ' + fmt(b.start) + '-' + fmt(b.end));
+    if (r.ok) { U.sel = b.roomId; renderView(); }
+  } else if (m.kind === 'move') {
+    const p = collect('move'), old = S.bookings.find(x => x.id === m.id), r = rescheduleBooking(m.id, w, p);
+    r.attempt = Object.assign({}, old, p, { ignore: m.id });
+    if (r.ok) { showResult(r, 'Moved'); renderView(); } else showResult(r, 'Moved');
+  } else if (m.kind === 'cancel') {
+    const reason = v('m-reason').trim();
+    if (reason.length < 3) { $('#m-res').innerHTML = '<div class="msg bad">Add a reason so students know why.</div>'; return; }
+    const r = cancelBooking(m.id, w, reason);
+    if (r.ok) { closeModal(); renderView(); toast('Cancelled. ' + audSize(r.notice.aud) + ' students notified.'); } else $('#m-res').innerHTML = '<div class="msg bad">' + esc(r.msg) + '</div>';
+  } else if (m.kind === 'report') {
+    const t = v('m-text').trim();
+    if (t.length < 3) { $('#m-res').innerHTML = '<div class="msg bad">Describe the problem in a few words.</div>'; return; }
+    addReport(m.id, w, t); closeModal(); renderView(); toast('Report sent. The booking now shows "Under review".');
+  }
+}
+
+// ---- Shell ----
+function renderWho() {
+  const opts = U.role === 'student' ? GROUPS.map(g => '<option value="' + g.key + '"' + (g.key === U.groupKey ? ' selected' : '') + '>' + esc(groupLabel(g)) + '</option>').join('')
+    : U.role === 'faculty' ? FAC.filter(f => f.id !== 'ADMIN').map(f => '<option value="' + f.id + '"' + (f.id === U.userId ? ' selected' : '') + '>' + esc(f.name) + '</option>').join('') : '<option>Exam Cell (admin)</option>';
+  $('#who').innerHTML = '<label class="small" for="role" style="margin:0">Viewing as</label><select id="role" style="width:auto"><option value="faculty"' + (U.role === 'faculty' ? ' selected' : '') + '>Faculty</option><option value="student"' + (U.role === 'student' ? ' selected' : '') + '>Student</option><option value="admin"' + (U.role === 'admin' ? ' selected' : '') + '>Admin</option></select><select id="user" style="width:auto;max-width:200px" aria-label="Person"' + (U.role === 'admin' ? ' disabled' : '') + '>' + opts + '</select>';
+}
+function renderNav() {
+  const tabs = TABS.filter(t => (t !== 'audit' || U.role !== 'student') && (t !== 'admin' || U.role === 'admin'));
+  if (!tabs.includes(U.tab)) U.tab = 'rooms';
+  const unseen = U.role === 'student' ? S.notices.filter(n => !n.supersededBy && matchAud(n.aud, grp()) && !n.acks.includes(meKey())).length : 0;
+  const names = { rooms: 'Find rooms', schedule: 'Schedule', notices: 'Notices' + (unseen ? ' (' + unseen + ' new)' : ''), audit: 'Audit trail', admin: 'Admin' };
+  $('#nav').innerHTML = tabs.map(t => '<a href="#' + t + '"' + (t === U.tab ? ' aria-current="page"' : '') + '>' + names[t] + '</a>').join('');
+}
+function renderView() {
+  renderNav();
+  $('#view').innerHTML = U.tab === 'rooms' ? viewRooms() : U.tab === 'schedule' ? viewSchedule() : U.tab === 'notices' ? viewNotices() : U.tab === 'audit' ? viewAudit() : viewAdmin();
+}
+function renderAll() { renderWho(); renderView(); }
+
+function setRole(r) {
+  U.role = r; U.mode = r === 'admin' ? 'all' : 'mine';
+  if (r === 'faculty' && !FAC.some(f => f.id === U.userId && f.id !== 'ADMIN')) U.userId = 'F7';
+  renderAll();
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-action]');
+  if (!t) { if (e.target.classList && e.target.classList.contains('scrim')) closeModal(); return; }
+  const a = t.dataset.action, w = who();
+  if (a === 'pick') { U.sel = t.dataset.room; renderView(); }
+  else if (a === 'book') openModal({ kind: 'book', room: t.dataset.room });
+  else if (a === 'close') closeModal();
+  else if (a === 'submit') submitModal();
+  else if (a === 'use-room') { $('#m-room').value = t.dataset.room; submitModal(); }
+  else if (a === 'use-slot') { $('#m-start').value = t.dataset.start; $('#m-room').value = t.dataset.room; submitModal(); }
+  else if (a === 'open-move') openModal({ kind: 'move', id: t.dataset.b });
+  else if (a === 'open-cancel') openModal({ kind: 'cancel', id: t.dataset.b });
+  else if (a === 'open-report') openModal({ kind: 'report', id: t.dataset.b });
+  else if (a === 'approve') { const n = approveBooking(t.dataset.b, w); renderView(); toast('Approved' + (n ? '. Students notified.' : '.')); }
+  else if (a === 'resolve') { resolveReport(t.dataset.b, Number(t.dataset.i), w); renderView(); }
+  else if (a === 'ack') { ackNotice(t.dataset.n, meKey()); renderAll(); }
+  else if (a === 'verify') { U.verify = verifyChain(); renderView(); }
+  else if (a === 'nl') {
+    const txt = $('#nl').value; U.nl = txt; const p = parseNL(txt);
+    if (!Object.keys(p).length) { U.nlMsg = 'Could not find seats, a date or a time in that. Try "60 students Friday 2 pm for 2 hours".'; renderView(); return; }
+    Object.assign(U.f, p.need ? { need: p.need } : {}, p.dur ? { dur: p.dur } : {}, p.start ? { start: p.start } : {}, p.date ? { date: p.date } : {}, p.b ? { b: p.b } : {}, p.type ? { type: p.type } : {}, p.purpose ? { purpose: p.purpose } : {});
+    if (U.f.start) { const m = toMin(U.f.start); U.f.start = fmt(Math.min(Math.max(Math.round(m / 30) * 30, OPEN), CLOSE - 30)); }
+    U.nlMsg = 'Understood: ' + [p.need && p.need + ' seats', p.date && dlabel(p.date), p.start && p.start, p.dur && (p.dur / 60) + ' h', p.b && BUILD[p.b], p.type && TYPENAME[p.type]].filter(Boolean).join(' · ');
+    renderView();
+  }
+  else if (a === 'publish') {
+    const title = v('n-title').trim(), body = v('n-body').trim();
+    if (!title || !body) { toast('Add a title and details first.'); return; }
+    const aud = { branch: v('n-b'), year: Number(v('n-y')), section: v('n-s') };
+    const n = announce(v('n-type'), title, body, aud, w.name, '', v('n-rep'));
+    renderAll(); toast('Published to ' + audSize(n.aud) + ' students.');
+  }
+  else if (a === 'toggle-room') { const rm = roomById(t.dataset.room); const list = setRoomOut(rm.id, !rm.out, 'maintenance', w); U.outInfo = rm.out ? { id: rm.id, list } : null; renderView(); }
+  else if (a === 'move-to') {
+    const r = rescheduleBooking(t.dataset.b, w, { roomId: t.dataset.room });
+    if (r.ok) { U.outInfo.list = U.outInfo.list.filter(b => b.id !== t.dataset.b); renderView(); toast('Moved. Students notified.'); } else toast(r.c.errors[0]);
+  }
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && U.modal) closeModal();
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.room')) { e.preventDefault(); U.sel = e.target.dataset.room; renderView(); const g = document.querySelector('.room.selected'); if (g) g.focus(); }
+  if (e.key === 'Enter' && e.target.id === 'nl') { e.preventDefault(); document.querySelector('[data-action="nl"]').click(); }
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.id === 'role') setRole(t.value);
+  else if (t.id === 'user') { if (U.role === 'student') U.groupKey = t.value; else U.userId = t.value; renderView(); }
+  else if (t.dataset.f) { U.f[t.dataset.f] = t.dataset.f === 'dur' || t.dataset.f === 'need' ? Number(t.value) : t.value; if (t.dataset.f === 'b') U.f.floor = 'ANY'; renderView(); }
+  else if (t.dataset.m === 'mode') { U.mode = t.value; renderView(); }
+  else if (t.dataset.m === 'aud' && U.modal && U.modal.kind === 'book') {
+    if (t.id === 'm-branch') $('#m-sec').innerHTML = secOpts(t.value, 'All');
+    $('#m-need').value = audSize({ branch: v('m-branch'), year: Number(v('m-year')), section: v('m-sec') });
+  }
+});
+function route() { const h = location.hash.slice(1); if (TABS.includes(h)) U.tab = h; renderView(); }
+window.addEventListener('hashchange', route);
+renderWho(); route();
+
+</script>
+
+</body></html>
